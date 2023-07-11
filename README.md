@@ -39,3 +39,18 @@ npm run deploy
 You can run `flyctl info` to get the url and ip address of your server.
 
 Check out the [fly docs](https://fly.io/docs/getting-started/node/) for more information.
+
+
+## DB
+
+Init DB
+
+```sh
+npx prisma init --datasource-provider sqlite
+```
+
+Create (or reset) DB
+
+```sh
+npx prisma db push # delete prisma/dev.db and run this command to reset DB
+```
