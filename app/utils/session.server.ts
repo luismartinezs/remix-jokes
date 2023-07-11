@@ -8,6 +8,17 @@ type LoginForm = {
   username: string;
 };
 
+export async function register({
+  password,
+  username,
+}: LoginForm) {
+  const passwordHash = await bcrypt.hash(password, 10);
+  const user = await db.user.create({
+    data: { passwordHash, username },
+  });
+  return { id: user.id, username };
+}
+
 export async function login({
   password,
   username,
@@ -60,6 +71,62 @@ export async function createUserSession(
   return redirect(redirectTo, {
     headers: {
       "Set-Cookie": await storage.commitSession(session),
+    },
+  });
+}
+
+function getUserSession(request: Request) {
+  return storage.getSession(request.headers.get("Cookie"));
+}
+
+export async function getUserId(request: Request) {
+  const session = await getUserSession(request);
+  const userId = session.get("userId");
+  if (!userId || typeof userId !== "string") {
+    return null;
+  }
+  return userId;
+}
+
+export async function requireUserId(
+  request: Request,
+  redirectTo: string = new URL(request.url).pathname
+) {
+  const session = await getUserSession(request);
+  const userId = session.get("userId");
+  if (!userId || typeof userId !== "string") {
+    const searchParams = new URLSearchParams([
+      ["redirectTo", redirectTo],
+    ]);
+    // redirect is a utility function that returns a Response object. Remix will catch that thrown response and send it back to the client. It's a great way to "exit early" in abstractions like this so users of our requireUserId function can just assume that the return will always give us the userId and don't need to worry about what happens if there isn't a userId because the response is thrown which stops their code execution
+    throw redirect(`/login?${searchParams}`);
+  }
+  return userId;
+}
+
+export async function getUser(request: Request) {
+  const userId = await getUserId(request);
+  if (typeof userId !== "string") {
+    return null;
+  }
+
+  const user = await db.user.findUnique({
+    select: { id: true, username: true },
+    where: { id: userId },
+  });
+
+  if (!user) {
+    throw logout(request);
+  }
+
+  return user;
+}
+
+export async function logout(request: Request) {
+  const session = await getUserSession(request);
+  return redirect("/login", {
+    headers: {
+      "Set-Cookie": await storage.destroySession(session),
     },
   });
 }
