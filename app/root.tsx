@@ -1,5 +1,11 @@
 import type { LinksFunction } from "@remix-run/node";
-import { Links, LiveReload, Outlet, useRouteError } from "@remix-run/react";
+import {
+  Links,
+  LiveReload,
+  Outlet,
+  isRouteErrorResponse,
+  useRouteError,
+} from "@remix-run/react";
 import type { PropsWithChildren } from "react";
 
 import globalLargeStylesUrl from "~/styles/global-large.css";
@@ -50,6 +56,18 @@ export default function App() {
 
 export function ErrorBoundary() {
   const error = useRouteError();
+
+  if (isRouteErrorResponse(error)) {
+    return (
+      <Document title={`${error.status} ${error.statusText}`}>
+        <div className="error-container">
+          <h1>
+            {error.status} {error.statusText}
+          </h1>
+        </div>
+      </Document>
+    );
+  }
 
   const errorMessage = error instanceof Error ? error.message : "Unknown error";
   return (
