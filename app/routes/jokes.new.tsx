@@ -129,6 +129,7 @@ export default function NewJokeRoute() {
 
 export function ErrorBoundary() {
   const error = useRouteError();
+  console.error(error);
 
   if (isRouteErrorResponse(error) && error.status === 401) {
     return (
