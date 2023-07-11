@@ -1,58 +1,110 @@
-import { json, type ActionArgs, redirect } from "@remix-run/node";
-import { Form, useActionData } from "@remix-run/react";
-import invariant from "tiny-invariant";
+import type { ActionArgs } from "@remix-run/node";
+import { redirect } from "@remix-run/node";
+import { useActionData } from "@remix-run/react";
+
 import { db } from "~/utils/db.server";
+import { badRequest } from "~/utils/request.server";
+
+function validateJokeContent(content: string) {
+  if (content.length < 10) {
+    return "That joke is too short";
+  }
+}
+
+function validateJokeName(name: string) {
+  if (name.length < 3) {
+    return "That joke's name is too short";
+  }
+}
 
 export const action = async ({ request }: ActionArgs) => {
-  const formData = await request.formData();
-  const name = formData.get("name");
-  const content = formData.get("content");
-
-  const errors = {
-    name: name ? null : "Name is required",
-    content: content ? null : "Content is required",
-  };
-
-  const hasErrors = Object.values(errors).some(Boolean);
-
-  if (hasErrors) {
-    return json(errors);
+  const form = await request.formData();
+  const content = form.get("content");
+  const name = form.get("name");
+  if (typeof content !== "string" || typeof name !== "string") {
+    return badRequest({
+      fieldErrors: null,
+      fields: null,
+      formError: "Form not submitted correctly.",
+    });
   }
 
-  invariant(typeof name === "string", "Name should be a string");
-  invariant(typeof content === "string", "Content should be a string");
+  const fieldErrors = {
+    content: validateJokeContent(content),
+    name: validateJokeName(name),
+  };
+  const fields = { content, name };
+  if (Object.values(fieldErrors).some(Boolean)) {
+    return badRequest({
+      fieldErrors,
+      fields,
+      formError: null,
+    });
+  }
 
-  const joke = await db.joke.create({
-    data: { name, content },
-  });
+  const joke = await db.joke.create({ data: fields });
   return redirect(`/jokes/${joke.id}`);
 };
 
 export default function NewJokeRoute() {
-  const errors = useActionData<typeof action>();
+  const actionData = useActionData<typeof action>();
 
   return (
     <div>
       <p>Add your own hilarious joke</p>
-      <Form method="post">
+      <form method="post">
         <div>
           <label>
-            Name: {errors?.name ?? <span>Name is required</span>}
-            <input type="text" name="name" />
+            Name:{" "}
+            <input
+              defaultValue={actionData?.fields?.name}
+              name="name"
+              type="text"
+              aria-invalid={Boolean(actionData?.fieldErrors?.name)}
+              aria-errormessage={
+                actionData?.fieldErrors?.name ? "name-error" : undefined
+              }
+            />
           </label>
+          {actionData?.fieldErrors?.name ? (
+            <p className="form-validation-error" id="name-error" role="alert">
+              {actionData.fieldErrors.name}
+            </p>
+          ) : null}
         </div>
         <div>
           <label>
-            Content: {errors?.content ?? <span>Content is required</span>}
-            <textarea name="content" />
+            Content:{" "}
+            <textarea
+              defaultValue={actionData?.fields?.content}
+              name="content"
+              aria-invalid={Boolean(actionData?.fieldErrors?.content)}
+              aria-errormessage={
+                actionData?.fieldErrors?.content ? "content-error" : undefined
+              }
+            />
           </label>
+          {actionData?.fieldErrors?.content ? (
+            <p
+              className="form-validation-error"
+              id="content-error"
+              role="alert"
+            >
+              {actionData.fieldErrors.content}
+            </p>
+          ) : null}
         </div>
         <div>
+          {actionData?.formError ? (
+            <p className="form-validation-error" role="alert">
+              {actionData.formError}
+            </p>
+          ) : null}
           <button type="submit" className="button">
             Add
           </button>
         </div>
-      </Form>
+      </form>
     </div>
   );
 }
